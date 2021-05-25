@@ -1,0 +1,283 @@
+---
+title: "Simulations Public Choice"
+output: html_document
+author: "Lea Krähenmann 19-609-221 & Sofía Carlota Velez Klumpp 19-617-372"
+hand-in date: "28.05.2021"
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(gtools)
+library(tidyverse)
+library(vote)
+library(ddpcr)
+library(STV)
+```
+
+## Creating a voting simulation 
+For the simulation to work out successfully, we require two things: 1) randomly generated voter preferences and 2) a function which yields the winner given those voting preferences. 
+Firstly, we consider the voter preferences. 
+
+## Preference generator 
+```{r}
+rand_vect <- function(N, M, sd = 1, pos.only = TRUE) {
+  rm(.Random.seed, envir=globalenv())
+  vec <- rnorm(N, M/N, sd)
+  if (abs(sum(vec)) < 0.01) vec <- vec + 1
+  vec <- round(vec / sum(vec) * M)
+  deviation <- M - sum(vec)
+  for (. in seq_len(abs(deviation))) {
+    vec[i] <- vec[i <- sample(N, 1)] + sign(deviation)
+  }
+  if (pos.only) while (any(vec < 0)) {
+    negs <- vec < 0
+    pos  <- vec > 0
+    vec[negs][i] <- vec[negs][i <- sample(sum(negs), 1)] + 1
+    vec[pos][i]  <- vec[pos ][i <- sample(sum(pos ), 1)] - 1
+  }
+  vec
+}
+```
+## Simulation with average abortion budget 96 according to voters preferences, using budget only on one alternative
+```{r}
+random_population_1 <- function(voters = 10000){
+   voting_profiles <- 
+  rbind(A = c(96, 0, 0),
+        B = c(0, 96, 0),
+        C = c(0, 0, 96),
+        D = c(0, 0, 96)) %>% 
+  as.data.frame() %>% tibble()
+   
+choices <- rand_vect(2, voters, sd = 0.125 * voters)
+
+pro_choice <- max(choices)
+
+rest <- rand_vect(2, min(choices), sd = 0.05 * voters)
+
+rest2 <- rand_vect(2, rest[1], sd = 0.03 * voters)
+
+voters_dist <- c(pro_choice, rest[2], rest2)
+
+pop <- 
+  voting_profiles %>% 
+  rename("Pro-Choice" = 1, "Pro-Life" = 2, "Status Quo" = 3) %>% 
+  slice(rep(1:n(), times = voters_dist)) %>% 
+  as.data.frame
+
+return(pop)
+}
+
+election <- function(n_voters = 10000){
+  
+pop <- random_population_1(voters = n_voters)
+
+winner <- 
+  pop %>% 
+  tibble %>% 
+  summarise_all(~sum(.x)) %>% 
+  pivot_longer(everything()) %>% 
+  filter(value == max(value)) %>% 
+  pull(name)
+
+return(c("Winner" = winner))
+}
+```
+
+```{r}
+df1 = data.frame("Winner" = "")
+
+for(i in 1:10000){
+  df1 = rbind(df1, election(10000))
+  print(str_c(i, "/10000"))
+}
+
+df1 = df1[-1,] %>% tibble() %>% rename(Winner = 1)
+
+df1
+
+df1 %>% 
+  count(Winner)
+```
+
+## Simulation with average abortion budget according to preferences, also voting for second choice alternatives
+```{r}
+random_population_2 <- function(voters = 10000){
+   voting_profiles <- 
+  rbind(A = c(80, 0, 16),
+        B = c(0, 80, 16),
+        C = c(0, 16, 80),
+        D = c(16, 0, 80)) %>% 
+  as.data.frame() %>% tibble()
+   
+choices <- rand_vect(2, voters, sd = 0.125 * voters)
+
+pro_choice <- max(choices)
+
+rest <- rand_vect(2, min(choices), sd = 0.05 * voters)
+
+rest2 <- rand_vect(2, rest[1], sd = 0.03 * voters)
+
+voters_dist <- c(pro_choice, rest[2], rest2)
+
+pop <- 
+  voting_profiles %>% 
+  rename("Pro-Choice" = 1, "Pro-Life" = 2, "Status Quo" = 3) %>% 
+  slice(rep(1:n(), times = voters_dist)) %>% 
+  as.data.frame
+
+return(pop)
+}
+
+election <- function(n_voters = 10000){
+  
+pop <- random_population_2(voters = n_voters)
+
+winner <- 
+  pop %>% 
+  tibble %>% 
+  summarise_all(~sum(.x)) %>% 
+  pivot_longer(everything()) %>% 
+  filter(value == max(value)) %>% 
+  pull(name)
+
+return(c("Winner" = winner))
+}
+```
+
+```{r}
+df2 = data.frame("Winner" = "")
+
+for(i in 1:10000){
+  df2 = rbind(df2, election(10000))
+  print(str_c(i, "/10000"))
+}
+
+df2 = df2[-1,] %>% tibble() %>% rename(Winner = 1)
+
+df2
+
+df2 %>% 
+  count(Winner)
+```
+
+## Simulation with average abortion budget, and more budget for pro-life due to affectedness, voting for one alternative 
+```{r}
+random_population_3 <- function(voters = 10000){
+   voting_profiles <- 
+  rbind(A = c(96, 0, 0),
+        B = c(0, 144, 0),
+        C = c(0, 0, 96),
+        D = c(0, 0,96)) %>% 
+  as.data.frame() %>% tibble()
+   
+choices <- rand_vect(2, voters, sd = 0.125 * voters)
+
+pro_choice <- max(choices)
+
+rest <- rand_vect(2, min(choices), sd = 0.05 * voters)
+
+rest2 <- rand_vect(2, rest[1], sd = 0.03 * voters)
+
+voters_dist <- c(pro_choice, rest[2], rest2)
+pop <- 
+  voting_profiles %>% 
+  rename("Pro-Choice" = 1, "Pro-Life" = 2, "Status Quo" = 3) %>% 
+  slice(rep(1:n(), times = voters_dist)) %>% 
+  as.data.frame
+
+return(pop)
+}
+
+election <- function(n_voters = 10000){
+  
+pop <- random_population_3(voters = n_voters)
+
+winner <- 
+  pop %>% 
+  tibble %>% 
+  summarise_all(~sum(.x)) %>% 
+  pivot_longer(everything()) %>% 
+  filter(value == max(value)) %>% 
+  pull(name)
+
+return(c("Winner" = winner))
+}
+```
+
+```{r}
+df3 = data.frame("Winner" = "")
+
+for(i in 1:10000){
+  df3 = rbind(df3, election(10000))
+  print(str_c(i, "/10000"))
+}
+
+df3 = df3[-1,] %>% tibble() %>% rename(Winner = 1)
+
+df3
+
+df3 %>% 
+  count(Winner)
+```
+
+## Simulation with average abortion budget, more budget for pro-life, and voting for 2 alternatives 
+```{r}
+random_population_4 <- function(voters = 10000){
+   voting_profiles <- 
+  rbind(A = c(80, 0, 16),
+        B = c(0, 120, 24),
+        C = c(0, 16, 80),
+        D = c(16, 0, 80)) %>% 
+  as.data.frame() %>% tibble()
+   
+choices <- rand_vect(2, voters, sd = 0.125 * voters)
+
+pro_choice <- max(choices)
+
+rest <- rand_vect(2, min(choices), sd = 0.05 * voters)
+
+rest2 <- rand_vect(2, rest[1], sd = 0.03 * voters)
+
+voters_dist <- c(pro_choice, rest[2], rest2)
+pop <- 
+  voting_profiles %>% 
+  rename("Pro-Choice" = 1, "Pro-Life" = 2, "Status Quo" = 3) %>% 
+  slice(rep(1:n(), times = voters_dist)) %>% 
+  as.data.frame
+
+return(pop)
+}
+
+election <- function(n_voters = 10000){
+  
+pop <- random_population_3(voters = n_voters)
+
+winner <- 
+  pop %>% 
+  tibble %>% 
+  summarise_all(~sum(.x)) %>% 
+  pivot_longer(everything()) %>% 
+  filter(value == max(value)) %>% 
+  pull(name)
+
+return(c("Winner" = winner))
+}
+```
+
+```{r}
+df4 = data.frame("Winner" = "")
+
+for(i in 1:10000){
+  df4 = rbind(df4, election(10000))
+  print(str_c(i, "/10000"))
+}
+
+df4 = df4[-1,] %>% tibble() %>% rename(Winner = 1)
+
+df4
+
+df4 %>% 
+  count(Winner)
+```
